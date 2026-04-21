@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, initial-scale=1.0">
+<title>Alpac SRL — Panel de Producción y Stock</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@400;500;600&display=swap');
+
+:root {
+  --bg:       #0d0d0d;
+  --bg2:      #141414;
+  --bg3:      #1a1a1a;
+  --bg4:      #222222;
+  --border:   #2a2a2a;
+  --border2:  #333333;
+  --text:     #e0e0e0;
+  --text2:    #999999;
+  --text3:    #555555;
+  --green:    #4caf50;
+  --green-bg: #0f2210;
+  --green-dim:#2a5c2a;
+  --red:      #f44336;
+  --red-bg:   #1f0a0a;
+  --amber:    #ff9800;
+  --amber-bg: #1f1200;
+  /* Factor de escala global — subir para agrandar todo */
+  --scale: 1.45;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-size: calc(16px * var(--scale));
+}
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  font-family: 'Barlow', sans-serif;
+  overflow: hidden;
+}
+
+#app {
+  width: 100vw; height: 100vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border2);
+  padding: 0 1.1rem;
+  height: 2.8rem;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.topbar-left { display: flex; align-items: center; gap: 1rem; }
+.topbar-logo {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1.3rem; font-weight: 700;
+  color: #fff; letter-spacing: 0.06em;
+}
+.topbar-logo span { color: var(--green); }
+.topbar-subtitle {
+  font-size: 0.75rem; color: var(--text2);
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.topbar-right { display: flex; align-items: center; gap: 1.2rem; }
+.topbar-date { font-size: 0.75rem; color: var(--text2); }
+.topbar-clock {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1.1rem; font-weight: 600; color: var(--text);
+}
+.legend { display: flex; gap: 1rem; align-items: center; }
+.leg-item { display: flex; align-items: center; gap: 0.3rem; font-size: 0.7rem; color: var(--text2); }
+.leg-dot { width: 0.55rem; height: 0.55rem; border-radius: 50%; }
+.leg-dot.g { background: var(--green); }
+.leg-dot.o { background: var(--amber); }
+.leg-dot.r { background: var(--red); }
+
+/* ── PROGRESS BAR ── */
+.progress-bar-wrap { height: 2px; background: var(--border); flex-shrink: 0; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--green); width: 0%; transition: none; }
+
+/* ── SCREENS ── */
+.screen { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.screen.active { display: flex; }
+
+/* ── SECTION HEADER ── */
+.sec-header { background: var(--bg3); border-bottom: 1px solid var(--border); padding: 0.3rem 0.9rem; flex-shrink: 0; }
+.sec-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.9rem; font-weight: 600;
+  color: var(--green); letter-spacing: 0.12em; text-transform: uppercase;
+}
+
+/* ── TABLES ── */
+table { width: 100%; border-collapse: collapse; }
+th {
+  background: var(--bg4);
+  color: var(--text2);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.68rem; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.25rem 0.5rem; text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+th.left { text-align: left; }
+td {
+  padding: 0.25rem 0.5rem; text-align: center;
+  color: var(--text2); font-size: 0.75rem;
+  border-bottom: 0.5px solid var(--border);
+}
+td.left { text-align: left; color: var(--text); }
+tr:last-child td { border-bottom: none; }
+.tn-cur { color: var(--green); font-weight: 600; }
+.tn-warn { color: var(--amber); font-weight: 600; }
+.rend-best { color: var(--green); font-weight: 700; }
+.rend-worst { color: var(--red); font-weight: 700; }
+
+/* ── PLAN BADGES ── */
+.plan-on {
+  background: var(--green-bg);
+  color: var(--green);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.78rem; font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.1rem 0.4rem; display: inline-block;
+  border-left: 2px solid var(--green-dim);
+}
+.plan-off {
+  background: var(--red-bg);
+  color: #883333;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.78rem; font-weight: 600;
+  padding: 0.1rem 0.4rem; display: inline-block;
+}
+
+/* ═══════════════════════════════
+   PANTALLA 1 — PRODUCCIÓN
+═══════════════════════════════ */
+#screen-prod { padding: 0.25rem; gap: 0.25rem; }
+
+.prod-section {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; border: 1px solid var(--border);
+}
+.prod-body { display: flex; flex: 1; overflow: hidden; }
+
+/* KPI capacidad */
+.kpi-block {
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  padding: 0 0.9rem; gap: 0.1rem;
+  flex-shrink: 0; border-right: 1px solid var(--border);
+  min-width: 5rem;
+}
+.kpi-year {
+  font-size: 0.55rem; color: var(--text3);
+  text-align: center; margin-top: 0.25rem;
+  font-family: 'Barlow Condensed', sans-serif; letter-spacing: 0.06em;
+}
+.kpi-year:first-child { margin-top: 0; }
+.kpi-pct {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700; text-align: center; line-height: 1;
+}
+.kpi-pct.cur  { font-size: 1.75rem; color: var(--green); }
+.kpi-pct.past { font-size: 1.1rem; color: var(--text3); }
+.kpi-pct.prev { font-size: 1rem; color: var(--amber); }
+.kpi-sep { width: 100%; height: 1px; background: var(--border); margin: 0.25rem 0; }
+
+/* Stats block */
+.stats-block {
+  display: flex; flex-direction: column;
+  overflow: hidden; border-right: 1px solid var(--border);
+  padding: 0.3rem 0.4rem; gap: 0.3rem; width: 15rem; flex-shrink: 0;
+}
+.stat-cards { display: flex; gap: 0.3rem; flex-shrink: 0; }
+.scard {
+  flex: 1; background: var(--bg4);
+  border: 1px solid var(--border);
+  border-radius: 3px; padding: 0.3rem 0.4rem; text-align: center;
+}
+.scard-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.55rem; color: var(--text3);
+  letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 0.15rem;
+}
+.scard-val { font-size: 1.1rem; font-weight: 600; color: var(--green); line-height: 1.1; }
+.scard-val.warn { color: var(--amber); }
+.scard-val.red  { color: var(--red); }
+.scard-sub { font-size: 0.55rem; color: var(--text3); margin-top: 0.1rem; }
+
+.rend-block { flex: 1; overflow: hidden; }
+
+/* Hist & Plan blocks */
+.hist-block {
+  flex: 1; overflow: hidden;
+  border-right: 1px solid var(--border);
+  padding: 0.3rem 0.4rem;
+}
+.plan-block { flex: 1; overflow: hidden; padding: 0.3rem 0.4rem; }
+.block-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.6rem; font-weight: 600; color: var(--text3);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  margin-bottom: 0.25rem; padding-left: 1px;
+}
+
+/* ═══════════════════════════════
+   PANTALLA 2 — STOCK
+═══════════════════════════════ */
+#screen-stock { flex-direction: row; padding: 0.3rem; gap: 0.4rem; }
+
+.stock-col { flex: 1; display: flex; flex-direction: column; gap: 0.3rem; overflow: hidden; }
+.stock-vdiv { width: 1px; background: var(--border); flex-shrink: 0; }
+
+.cat-block { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); }
+.cat-block.grow { flex: 1; }
+
+/* Stock table */
+.st { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.st th {
+  background: var(--bg3);
+  color: var(--text3);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.6rem; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.2rem 0.45rem; text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.st th.left { text-align: left; }
+.st td { padding: 0.28rem 0.45rem; border-bottom: 0.5px solid var(--bg4); color: var(--text2); text-align: center; font-size: 0.78rem; }
+.st td.pname { text-align: left; color: var(--text); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st td.pname.aq { color: var(--text2); padding-left: 1rem; font-size: 0.74rem; }
+tr:last-child .st td { border-bottom: none; }
+
+/* Stock badges */
+.badge { display: inline-block; padding: 0.12rem 0.5rem; font-family: 'Barlow Condensed', sans-serif; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; border-radius: 1px; }
+.badge-ok   { background: var(--green-bg); color: var(--green); }
+.badge-min  { background: var(--amber-bg); color: var(--amber); }
+.badge-crit { background: var(--red-bg);   color: var(--red); }
+.num-ok   { color: #fff; font-weight: 600; font-size: 0.85rem; }
+.num-min  { color: var(--amber); font-weight: 700; font-size: 0.85rem; }
+.num-crit { color: var(--red); font-weight: 700; font-size: 0.85rem; }
+
+/* ── LOADING ── */
+#loading {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 0.75rem; z-index: 999;
+}
+.load-title { font-family: 'Barlow Condensed', sans-serif; font-size: 1.5rem; font-weight: 700; color: var(--green); letter-spacing: 0.1em; }
+.load-sub { font-size: 0.75rem; color: var(--text3); }
+.spinner { width: 1.75rem; height: 1.75rem; border: 2px solid var(--border2); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="load-title">ALPAC SRL</div>
+  <div class="load-sub">Cargando datos...</div>
+</div>
+
+<div id="app" style="display:none">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">ALPAC <span>SRL</span></div>
+      <div class="topbar-subtitle" id="screen-label">Estado de Producción</div>
+    </div>
+    <div class="topbar-right">
+      <div class="legend" id="stock-legend" style="display:none">
+        <div class="leg-item"><div class="leg-dot g"></div>OK — sobre mínimo</div>
+        <div class="leg-item"><div class="leg-dot o"></div>Mínimo — planificar</div>
+        <div class="leg-item"><div class="leg-dot r"></div>Crítico — producir ya</div>
+      </div>
+      <div class="topbar-date" id="topbar-date"></div>
+      <div class="topbar-clock" id="topbar-clock"></div>
+    </div>
+  </div>
+
+  <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+
+  <!-- ═══════════════════════════════
+       PANTALLA 1 — PRODUCCIÓN
+  ═══════════════════════════════ -->
+  <div id="screen-prod" class="screen active">
+
+    <!-- BANDEJAS -->
+    <div class="prod-section">
+      <div class="sec-header"><span class="sec-label">Bandejas — Indicadores y Planificación</span></div>
+      <div class="prod-body">
+
+        <div class="kpi-block">
+          <div class="kpi-year">2024</div><div class="kpi-pct past" id="b-cap-2024">—</div>
+          <div class="kpi-sep"></div>
+          <div class="kpi-year">2025</div><div class="kpi-pct past" id="b-cap-2025">—</div>
+          <div class="kpi-sep"></div>
+          <div class="kpi-year">2026</div><div class="kpi-pct cur" id="b-cap-2026">—</div>
+          <div class="kpi-sep"></div>
+          <div class="kpi-year">Mes ant.</div><div class="kpi-pct prev" id="b-cap-prev">—</div>
+        </div>
+
+        <div class="stats-block">
+          <div class="stat-cards">
+            <div class="scard">
+              <div class="scard-label">Activas</div>
+              <div class="scard-val" id="b-activas">—</div>
+              <div class="scard-sub">prensas</div>
+            </div>
+            <div class="scard">
+              <div class="scard-label">Mejor rend.</div>
+              <div class="scard-val" id="b-best-val">—</div>
+              <div class="scard-sub" id="b-best-name">—</div>
+            </div>
+            <div class="scard">
+              <div class="scard-label">Peor rend.</div>
+              <div class="scard-val warn" id="b-worst-val">—</div>
+              <div class="scard-sub" id="b-worst-name">—</div>
+            </div>
+          </div>
+          <div class="rend-block">
+            <table>
+              <tr><th class="left">Prensa</th><th>Rend.</th><th class="left">Prensa</th><th>Rend.</th></tr>
+            </table>
+            <table id="tb-rend-bandejas"></table>
+          </div>
+        </div>
+
+        <div class="hist-block">
+          <div class="block-title">Planificación del día — FC-10-03-01</div>
+          <table>
+            <tr><th class="left">Prensa</th><th class="left">Operador</th><th class="left">Producto</th><th>Día</th></tr>
+          </table>
+          <table id="tb-plan-bandejas"></table>
+        </div>
+
+        <div class="plan-block">
+          <div class="block-title">Toneladas producidas — histórico mensual</div>
+          <table id="tb-hist-bandejas"></table>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ROLLOS -->
+    <div class="prod-section">
+      <div class="sec-header"><span class="sec-label">Rollos — Indicadores y Planificación</span></div>
+      <div class="prod-body">
+
+        <div class="kpi-block">
+          <div class="kpi-year">2025</div><div class="kpi-pct past" id="r-cap-2025">—</div>
+          <div class="kpi-sep"></div>
+          <div class="kpi-year">2026</div><div class="kpi-pct cur" id="r-cap-2026">—</div>
+          <div class="kpi-sep"></div>
+          <div class="kpi-year">Mes ant.</div><div class="kpi-pct prev" id="r-cap-prev">—</div>
+        </div>
+
+        <div class="stats-block">
+          <div class="stat-cards">
+            <div class="scard">
+              <div class="scard-label">Activos</div>
+              <div class="scard-val" id="r-activos">—</div>
+              <div class="scard-sub">equipos</div>
+            </div>
+            <div class="scard">
+              <div class="scard-label">Mejor rend.</div>
+              <div class="scard-val" id="r-best-val">—</div>
+              <div class="scard-sub" id="r-best-name">—</div>
+            </div>
+            <div class="scard">
+              <div class="scard-label">Peor rend.</div>
+              <div class="scard-val warn" id="r-worst-val">—</div>
+              <div class="scard-sub" id="r-worst-name">—</div>
+            </div>
+          </div>
+          <div class="rend-block">
+            <table>
+              <tr><th class="left">Equipo</th><th>Rend.</th><th class="left">Equipo</th><th>Rend.</th></tr>
+            </table>
+            <table id="tb-rend-rollos"></table>
+          </div>
+        </div>
+
+        <div class="hist-block">
+          <div class="block-title">Planificación del día — FC-10-04-02</div>
+          <table>
+            <tr><th class="left">Equipo</th><th class="left">Operador/es</th><th class="left">Producto</th><th>Día</th></tr>
+          </table>
+          <table id="tb-plan-rollos"></table>
+        </div>
+
+        <div class="plan-block">
+          <div class="block-title">Toneladas producidas — histórico mensual</div>
+          <table id="tb-hist-rollos"></table>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════
+       PANTALLA 2 — STOCK
+  ═══════════════════════════════ -->
+  <div id="screen-stock" class="screen">
+
+    <!-- COL 1: BANDEJAS + TAPAS ALU/CARTÓN -->
+    <div class="stock-col">
+      <div class="cat-block grow">
+        <div class="sec-header"><span class="sec-label">Bandejas</span></div>
+        <table class="st">
+          <colgroup><col style="width:52%"><col style="width:20%"><col style="width:28%"></colgroup>
+          <tr><th class="left">Producto</th><th>Cajas</th><th>Estado</th></tr>
+        </table>
+        <table class="st" id="tb-stock-bandejas"></table>
+      </div>
+      <div class="cat-block">
+        <div class="sec-header"><span class="sec-label">Tapas alu/cartón</span></div>
+        <table class="st" id="tb-stock-tapas-carton"></table>
+      </div>
+    </div>
+
+    <div class="stock-vdiv"></div>
+
+    <!-- COL 2: PLATOS + BUDINERAS + VASOS -->
+    <div class="stock-col">
+      <div class="cat-block">
+        <div class="sec-header"><span class="sec-label">Platos</span></div>
+        <table class="st" id="tb-stock-platos"></table>
+      </div>
+      <div class="cat-block">
+        <div class="sec-header"><span class="sec-label">Budineras</span></div>
+        <table class="st" id="tb-stock-budineras"></table>
+      </div>
+      <div class="cat-block grow">
+        <div class="sec-header"><span class="sec-label">Vasos</span></div>
+        <table class="st" id="tb-stock-vasos"></table>
+      </div>
+    </div>
+
+    <div class="stock-vdiv"></div>
+
+    <!-- COL 3: TAPAS ALU + ROLLOS -->
+    <div class="stock-col">
+      <div class="cat-block">
+        <div class="sec-header"><span class="sec-label">Tapas aluminio</span></div>
+        <table class="st" id="tb-stock-tapas"></table>
+      </div>
+      <div class="cat-block grow">
+        <div class="sec-header"><span class="sec-label">Rollos</span></div>
+        <table class="st" id="tb-stock-rollos"></table>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzouOetdsLAow_xzm2gRvR4esyr4XWBv61IWTcmdoFWtHolf_lkz9jyRiOjd_dRCf7n/exec';
+const ROTATE_MS  = 45000;
+const REFRESH_MS = 300000;
+
+// ── CATEGORÍAS DE STOCK ──────────────────────────────
+const CATS = {
+  bandejas: [
+    'BANDEJA B/4 F 200','BANDEJA B/4 F 200 ALUPAQ',
+    'BANDEJA B/5 F 2100','BANDEJA B/5 F 2100 ALUPAQ',
+    'BANDEJA C 200','BANDEJA C 200 ALUPAQ',
+    'BANDEJA F 100','BANDEJA F 100 ALUPAQ',
+    'BANDEJA F 50','BANDEJA F 50 ALUPAQ',
+    'BANDEJA F 75','BANDEJA F 75 ALUPAQ',
+    'BANDEJA R/2 F 250','BANDEJA R/2 F 250 ALUPAQ',
+    'BANDEJA R/3 F275','BANDEJA R/3 F275 ALUPAQ',
+    'BANDEJA VIA AEREA',
+    'PO ALUPAQ',
+  ],
+  'tapas-carton': [
+    'TAPA ALU/CARTON F 50',
+    'TAPA ALU/CARTON F 75','TAPA ALU/CARTON F 75 ALUPAQ',
+    'TAPA ALU/CARTON F 100','TAPA ALU/CARTON F 100 ALUPAQ',
+    'TAPA ALU/CARTON F 200',
+    'TAPA ALU/CARTON C 200',
+  ],
+  platos: [
+    'PLATO P 14','PLATO P 15',
+    'PLATO P 20','PLATO P 20 ALUPAQ',
+    'PLATO P 23','PLATO P 23 ALUPAQ',
+    'PLATO P 26','PLATO P 26 ALUPAQ',
+    'PLATO P 30','PLATO P 33',
+  ],
+  budineras: [
+    'BUDINERA A-B 30','BUDINERA A-B 60',
+    'BUDINERA A-B 80','BUDINERA A-B 260',
+  ],
+  vasos: [
+    'VASO H 5','VASO H 7','VASO H 9','VASO H 10',
+    'Vaso V 100 ALUPAQ','Vaso V 120 ALUPAQ',
+    'VASO V 130 ALUPAQ','Vaso V 230 ALUPAQ',
+  ],
+  tapas: [
+    'TAPA ALUMINIO F 2100','TAPA ALUMINIO F 2100 ALUPAQ',
+    'TAPA ALUMINIO F 250','TAPA ALUMINIO F 250 ALUPAQ',
+    'TAPA ALUMINIO F 275','TAPA ALUMINIO F 275 ALUPAQ',
+  ],
+  rollos: [
+    'ROLLO ALPAC 10 MIC X 280 MM X 5 MTS',
+    'ROLLO ALPAC PAPEL MANTECA 5 MTS',
+    'ROLLO ALPAC PAPEL MANTECA 1 KG',
+    'ROLLO ALPAC 18 MIC X 380 MM / 1 KG',
+    'ROLLO ALPAC 18 MIC X 380 MM / 1 KG ECONOMICO',
+    'ROLLO ALPAC 18 MIC X 380 MM X 100 MTS / 2 KG APROX.',
+    'ROLLO ALUPAQ ALUMINIO 30 MTS',
+    'ROLLO ALUPAQ ALUMINIO 50 MTS',
+  ],
+};
+
+// ── NOMBRES DISPLAY ──────────────────────────────────
+const DISP = {
+  'BANDEJA B/4 F 200':'B/4 F 200','BANDEJA B/4 F 200 ALUPAQ':'— Alupaq',
+  'BANDEJA B/5 F 2100':'B/5 F 2100','BANDEJA B/5 F 2100 ALUPAQ':'— Alupaq',
+  'BANDEJA C 200':'C 200','BANDEJA C 200 ALUPAQ':'— Alupaq',
+  'BANDEJA F 100':'F 100','BANDEJA F 100 ALUPAQ':'— Alupaq',
+  'BANDEJA F 50':'F 50','BANDEJA F 50 ALUPAQ':'— Alupaq',
+  'BANDEJA F 75':'F 75','BANDEJA F 75 ALUPAQ':'— Alupaq',
+  'BANDEJA R/2 F 250':'R/2 F 250','BANDEJA R/2 F 250 ALUPAQ':'— Alupaq',
+  'BANDEJA R/3 F275':'R/3 F 275','BANDEJA R/3 F275 ALUPAQ':'— Alupaq',
+  'BANDEJA VIA AEREA':'Vía aérea','PO ALUPAQ':'PO Alupaq',
+  'TAPA ALU/CARTON F 50':'F 50',
+  'TAPA ALU/CARTON F 75':'F 75','TAPA ALU/CARTON F 75 ALUPAQ':'— Alupaq',
+  'TAPA ALU/CARTON F 100':'F 100','TAPA ALU/CARTON F 100 ALUPAQ':'— Alupaq',
+  'TAPA ALU/CARTON F 200':'F 200','TAPA ALU/CARTON C 200':'C 200',
+  'PLATO P 14':'P 14','PLATO P 15':'P 15',
+  'PLATO P 20':'P 20','PLATO P 20 ALUPAQ':'— Alupaq',
+  'PLATO P 23':'P 23','PLATO P 23 ALUPAQ':'— Alupaq',
+  'PLATO P 26':'P 26','PLATO P 26 ALUPAQ':'— Alupaq',
+  'PLATO P 30':'P 30','PLATO P 33':'P 33',
+  'BUDINERA A-B 30':'A-B 30','BUDINERA A-B 60':'A-B 60',
+  'BUDINERA A-B 80':'A-B 80','BUDINERA A-B 260':'A-B 260',
+  'VASO H 5':'H 5','VASO H 7':'H 7','VASO H 9':'H 9','VASO H 10':'H 10',
+  'Vaso V 100 ALUPAQ':'V 100 Alupaq','Vaso V 120 ALUPAQ':'V 120 Alupaq',
+  'VASO V 130 ALUPAQ':'V 130 Alupaq','Vaso V 230 ALUPAQ':'V 230 Alupaq',
+  'TAPA ALUMINIO F 2100':'F 2100','TAPA ALUMINIO F 2100 ALUPAQ':'— Alupaq',
+  'TAPA ALUMINIO F 250':'F 250','TAPA ALUMINIO F 250 ALUPAQ':'— Alupaq',
+  'TAPA ALUMINIO F 275':'F 275','TAPA ALUMINIO F 275 ALUPAQ':'— Alupaq',
+  'ROLLO ALPAC 10 MIC X 280 MM X 5 MTS':'Alpac 5mts',
+  'ROLLO ALPAC PAPEL MANTECA 5 MTS':'Manteca 5mts',
+  'ROLLO ALPAC PAPEL MANTECA 1 KG':'Manteca 1kg',
+  'ROLLO ALPAC 18 MIC X 380 MM / 1 KG':'18mic 1kg',
+  'ROLLO ALPAC 18 MIC X 380 MM / 1 KG ECONOMICO':'18mic 1kg eco',
+  'ROLLO ALPAC 18 MIC X 380 MM X 100 MTS / 2 KG APROX.':'18mic 2kg',
+  'ROLLO ALUPAQ ALUMINIO 30 MTS':'Alupaq 30mts',
+  'ROLLO ALUPAQ ALUMINIO 50 MTS':'Alupaq 50mts',
+};
+
+// ── UMBRALES ─────────────────────────────────────────
+const UMB = {
+  'BANDEJA B/4 F 200':{min:53,crit:17},'BANDEJA B/4 F 200 ALUPAQ':{min:10,crit:4},
+  'BANDEJA B/5 F 2100':{min:17,crit:6},'BANDEJA B/5 F 2100 ALUPAQ':{min:1,crit:1},
+  'BANDEJA C 200':{min:19,crit:6},'BANDEJA C 200 ALUPAQ':{min:3,crit:1},
+  'BANDEJA F 100':{min:148,crit:48},'BANDEJA F 100 ALUPAQ':{min:8,crit:3},
+  'BANDEJA F 50':{min:14,crit:5},'BANDEJA F 50 ALUPAQ':{min:9,crit:3},
+  'BANDEJA F 75':{min:142,crit:46},'BANDEJA F 75 ALUPAQ':{min:10,crit:3},
+  'BANDEJA R/2 F 250':{min:13,crit:4},'BANDEJA R/2 F 250 ALUPAQ':{min:10,crit:3},
+  'BANDEJA R/3 F275':{min:32,crit:10},'BANDEJA R/3 F275 ALUPAQ':{min:23,crit:8},
+  'BANDEJA VIA AEREA':{min:8,crit:3},'PO ALUPAQ':{min:8,crit:3},
+  'PLATO P 14':{min:10,crit:3},'PLATO P 15':{min:10,crit:3},
+  'PLATO P 20':{min:43,crit:14},'PLATO P 20 ALUPAQ':{min:10,crit:4},
+  'PLATO P 23':{min:86,crit:28},'PLATO P 23 ALUPAQ':{min:10,crit:4},
+  'PLATO P 26':{min:42,crit:14},'PLATO P 26 ALUPAQ':{min:10,crit:4},
+  'PLATO P 30':{min:20,crit:7},'PLATO P 33':{min:20,crit:7},
+  'BUDINERA A-B 30':{min:103,crit:33},'BUDINERA A-B 60':{min:82,crit:27},
+  'BUDINERA A-B 80':{min:10,crit:3},'BUDINERA A-B 260':{min:10,crit:3},
+  'VASO H 5':{min:1,crit:1},'VASO H 7':{min:3,crit:1},
+  'VASO H 9':{min:11,crit:4},'VASO H 10':{min:18,crit:6},
+  'Vaso V 100 ALUPAQ':{min:5,crit:2},'Vaso V 120 ALUPAQ':{min:5,crit:2},
+  'VASO V 130 ALUPAQ':{min:5,crit:2},'Vaso V 230 ALUPAQ':{min:5,crit:2},
+  'TAPA ALUMINIO F 2100':{min:13,crit:4},'TAPA ALUMINIO F 2100 ALUPAQ':{min:1,crit:1},
+  'TAPA ALUMINIO F 250':{min:10,crit:4},'TAPA ALUMINIO F 250 ALUPAQ':{min:9,crit:3},
+  'TAPA ALUMINIO F 275':{min:20,crit:7},'TAPA ALUMINIO F 275 ALUPAQ':{min:20,crit:7},
+  'ROLLO ALPAC 10 MIC X 280 MM X 5 MTS':{min:73,crit:24},
+  'ROLLO ALPAC PAPEL MANTECA 5 MTS':{min:33,crit:11},
+  'ROLLO ALPAC PAPEL MANTECA 1 KG':{min:36,crit:12},
+  'ROLLO ALPAC 18 MIC X 380 MM / 1 KG':{min:50,crit:16},
+  'ROLLO ALPAC 18 MIC X 380 MM / 1 KG ECONOMICO':{min:75,crit:24},
+  'ROLLO ALPAC 18 MIC X 380 MM X 100 MTS / 2 KG APROX.':{min:8,crit:3},
+  'ROLLO ALUPAQ ALUMINIO 30 MTS':{min:8,crit:3},
+  'ROLLO ALUPAQ ALUMINIO 50 MTS':{min:15,crit:5},
+};
+
+function estado(prod, cajas) {
+  const u = UMB[prod];
+  if (!u) return 'OK';
+  if (cajas <= u.crit) return 'CRITICO';
+  if (cajas <= u.min)  return 'MINIMO';
+  return 'OK';
+}
+
+function badge(est) {
+  if (est === 'CRITICO') return '<span class="badge badge-crit">CRÍTICO</span>';
+  if (est === 'MINIMO')  return '<span class="badge badge-min">MÍNIMO</span>';
+  return '<span class="badge badge-ok">OK</span>';
+}
+
+function numCls(est) {
+  if (est === 'CRITICO') return 'num-crit';
+  if (est === 'MINIMO')  return 'num-min';
+  return 'num-ok';
+}
+
+// ── RENDER STOCK ─────────────────────────────────────
+function renderStock(stockMap) {
+  const colgroup = `<colgroup><col style="width:52%"><col style="width:20%"><col style="width:28%"></colgroup>`;
+  const thead = `<tr><th class="left">Producto</th><th>Cajas</th><th>Estado</th></tr>`;
+
+  for (const [cat, prods] of Object.entries(CATS)) {
+    const rows = prods.map(prod => {
+      const d = stockMap.get(prod);
+      const cajas = d ? (d.cajas || 0) : 0;
+      const est = estado(prod, cajas);
+      const nc  = numCls(est);
+      const nombre = DISP[prod] || prod;
+      const isAq = nombre === '— Alupaq' || prod.includes('ALUPAQ') || prod.includes('Alupaq');
+      const aqClass = (nombre === '— Alupaq') ? ' aq' : '';
+      return `<tr>
+        <td class="pname${aqClass}">${nombre}</td>
+        <td class="${nc}">${cajas}</td>
+        <td>${badge(est)}</td>
+      </tr>`;
+    }).join('');
+    const el = document.getElementById(`tb-stock-${cat}`);
+    if (el) el.innerHTML = colgroup + thead + rows;
+  }
+}
+
+// ── RENDER PRODUCCIÓN ────────────────────────────────
+function pctNum(s) {
+  return s ? parseFloat(s.replace('%','')) : 0;
+}
+
+function renderProduccion(data) {
+  // Capacidad
+  const bc = data.capacidad?.bandejas || {};
+  const rc = data.capacidad?.rollos   || {};
+  ['2024','2025','2026'].forEach(a => {
+    if (bc[a]) { const el = document.getElementById(`b-cap-${a}`); if(el) el.textContent = bc[a]; }
+  });
+  if (rc['2025']) { const el = document.getElementById('r-cap-2025'); if(el) el.textContent = rc['2025']; }
+  if (rc['2026']) { const el = document.getElementById('r-cap-2026'); if(el) el.textContent = rc['2026']; }
+
+  // Rendimiento bandejas — en dos columnas, verde=mejor, rojo=peor
+  if (data.rendBandejas?.length) {
+    const rends = data.rendBandejas;
+    const numRends = rends.map(r => ({...r, n: pctNum(r.rend)})).filter(r => r.n > 0);
+    const bestVal  = numRends.length ? Math.max(...numRends.map(r=>r.n)) : 0;
+    const worstVal = numRends.length ? Math.min(...numRends.map(r=>r.n)) : 0;
+    const bestName  = numRends.find(r=>r.n===bestVal)?.equipo  || '—';
+    const worstName = numRends.find(r=>r.n===worstVal)?.equipo || '—';
+    const activas = rends.filter(r => pctNum(r.rend) > 0).length;
+
+    const bAct = document.getElementById('b-activas');
+    if(bAct) bAct.textContent = `${activas} / ${rends.length}`;
+    const bBV = document.getElementById('b-best-val');
+    if(bBV) bBV.textContent = bestVal+'%';
+    const bBN = document.getElementById('b-best-name');
+    if(bBN) bBN.textContent = bestName;
+    const bWV = document.getElementById('b-worst-val');
+    if(bWV) bWV.textContent = worstVal+'%';
+    const bWN = document.getElementById('b-worst-name');
+    if(bWN) bWN.textContent = worstName;
+
+    const mid = Math.ceil(rends.length / 2);
+    let html = '';
+    for (let i = 0; i < mid; i++) {
+      const a = rends[i];
+      const b = rends[i+mid];
+      const aCls = pctNum(a?.rend)===bestVal?'rend-best':pctNum(a?.rend)===worstVal&&pctNum(a?.rend)>0?'rend-worst':'';
+      const bCls = b ? (pctNum(b.rend)===bestVal?'rend-best':pctNum(b.rend)===worstVal&&pctNum(b.rend)>0?'rend-worst':'') : '';
+      html += `<tr>
+        <td class="left">${a?.equipo||'—'}</td><td class="${aCls}">${a?.rend||'—'}</td>
+        <td class="left">${b?.equipo||''}</td><td class="${bCls}">${b?.rend||''}</td>
+      </tr>`;
+    }
+    document.getElementById('tb-rend-bandejas').innerHTML = html;
+  }
+
+  // Rendimiento rollos
+  if (data.rendRollos?.length) {
+    const rends = data.rendRollos;
+    const numRends = rends.map(r => ({...r, n: pctNum(r.rend)})).filter(r => r.n > 0);
+    const bestVal  = numRends.length ? Math.max(...numRends.map(r=>r.n)) : 0;
+    const worstVal = numRends.length ? Math.min(...numRends.map(r=>r.n)) : 0;
+    const bestName  = numRends.find(r=>r.n===bestVal)?.equipo  || '—';
+    const worstName = numRends.find(r=>r.n===worstVal)?.equipo || '—';
+    const activos = rends.filter(r => pctNum(r.rend) > 0).length;
+
+    const rAct = document.getElementById('r-activos');
+    if(rAct) rAct.textContent = `${activos} / ${rends.length}`;
+    const rBV = document.getElementById('r-best-val');
+    if(rBV) rBV.textContent = bestVal+'%';
+    const rBN = document.getElementById('r-best-name');
+    if(rBN) rBN.textContent = bestName;
+    const rWV = document.getElementById('r-worst-val');
+    if(rWV) rWV.textContent = worstVal+'%';
+    const rWN = document.getElementById('r-worst-name');
+    if(rWN) rWN.textContent = worstName;
+
+    const mid = Math.ceil(rends.length / 2);
+    let html = '';
+    for (let i = 0; i < mid; i++) {
+      const a = rends[i];
+      const b = rends[i+mid];
+      const aCls = pctNum(a?.rend)===bestVal?'rend-best':pctNum(a?.rend)===worstVal&&pctNum(a?.rend)>0?'rend-worst':'';
+      const bCls = b ? (pctNum(b.rend)===bestVal?'rend-best':pctNum(b.rend)===worstVal&&pctNum(b.rend)>0?'rend-worst':'') : '';
+      html += `<tr>
+        <td class="left">${a?.equipo||'—'}</td><td class="${aCls}">${a?.rend||'—'}</td>
+        <td class="left">${b?.equipo||''}</td><td class="${bCls}">${b?.rend||''}</td>
+      </tr>`;
+    }
+    document.getElementById('tb-rend-rollos').innerHTML = html;
+  }
+
+  // Histórico
+  const renderHist = (rows, elId) => {
+    if (!rows?.length) return;
+    const v = rows.filter(r => r.mes25 !== '—' || r.mes26 !== '—');
+    const mid = Math.ceil(v.length / 2);
+    let html = '<tr><th>Mes</th><th>Tn 25</th><th>Tn 26</th><th>Mes</th><th>Tn 25</th><th>Tn 26</th></tr>';
+    for (let i = 0; i < mid; i++) {
+      const a = v[i]     || {mes25:'—',tn25:'—',mes26:'—',tn26:'—'};
+      const b = v[i+mid] || {mes25:'—',tn25:'—',mes26:'—',tn26:'—'};
+      html += `<tr>
+        <td>${a.mes25}</td><td>${a.tn25}</td><td class="${a.tn26!=='—'?'tn-cur':''}">${a.tn26}</td>
+        <td>${b.mes25}</td><td>${b.tn25}</td><td class="${b.tn26!=='—'?'tn-cur':''}">${b.tn26}</td>
+      </tr>`;
+    }
+    document.getElementById(elId).innerHTML = html;
+  };
+  renderHist(data.tnBandejas, 'tb-hist-bandejas');
+  renderHist(data.tnRollos,   'tb-hist-rollos');
+
+  // Planificación
+  const renderPlan = (rows, elId) => {
+    if (!rows?.length) return;
+    document.getElementById(elId).innerHTML = rows.map(r =>
+      `<tr>
+        <td class="left">${r.equipo}</td>
+        <td class="left">${r.operador}</td>
+        <td><span class="${r.activo?'plan-on':'plan-off'}">${r.producto}</span></td>
+        <td style="color:var(--text3);font-size:10px">${r.dia}</td>
+      </tr>`).join('');
+  };
+  renderPlan(data.planBandejas, 'tb-plan-bandejas');
+  renderPlan(data.planRollos,   'tb-plan-rollos');
+}
+
+// ── FETCH ────────────────────────────────────────────
+async function fetchDatos() {
+  try {
+    const res  = await fetch(APPS_SCRIPT_URL);
+    const data = await res.json();
+    if (data.error) { console.warn('Apps Script error:', data.error); return; }
+    renderProduccion(data);
+    const stockMap = new Map();
+    for (const item of (data.stock || [])) {
+      stockMap.set(item.producto.trim(), { cajas: item.cajas });
+    }
+    renderStock(stockMap);
+  } catch(e) {
+    console.warn('Error al cargar datos:', e);
+  }
+}
+
+// ── RELOJ ────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const dias   = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const meses  = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const fecha  = `${dias[now.getDay()]} ${now.getDate()} de ${meses[now.getMonth()]} de ${now.getFullYear()}`;
+  const hora   = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  document.getElementById('topbar-date').textContent  = fecha;
+  document.getElementById('topbar-clock').textContent = hora;
+}
+
+// ── ROTACIÓN ─────────────────────────────────────────
+let currentScreen = 0;
+function switchScreen() {
+  const screens = ['screen-prod','screen-stock'];
+  const labels  = ['Estado de Producción','Stock de Productos'];
+  document.getElementById(screens[currentScreen]).classList.remove('active');
+  currentScreen = (currentScreen + 1) % screens.length;
+  document.getElementById(screens[currentScreen]).classList.add('active');
+  document.getElementById('screen-label').textContent = labels[currentScreen];
+  document.getElementById('stock-legend').style.display = currentScreen === 1 ? 'flex' : 'none';
+  startProgress();
+}
+
+function startProgress() {
+  const bar = document.getElementById('progress-bar');
+  bar.style.transition = 'none';
+  bar.style.width = '0%';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    bar.style.transition = `width ${ROTATE_MS}ms linear`;
+    bar.style.width = '100%';
+  }));
+}
+
+// ── INIT ─────────────────────────────────────────────
+async function init() {
+  await fetchDatos();
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  updateClock();
+  setInterval(updateClock, 1000);
+  startProgress();
+  setInterval(switchScreen, ROTATE_MS);
+  setInterval(fetchDatos, REFRESH_MS);
+}
+
+init();
+</script>
+</body>
+</html>
